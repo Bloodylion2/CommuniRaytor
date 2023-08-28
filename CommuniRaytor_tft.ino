@@ -4,10 +4,11 @@
 #include <IRCClient.h>           // Changed it so it gave me more info about the chatters
 #include <TFT_eSPI.h> 
 #include <SPI.h>
-#include "Ray.h"    // Image converter http://www.rinkydinkelectronics.com/t_imageconverter565.php
 #include "pin_config.h"
+#include "Ray.h"    // Image converter http://www.rinkydinkelectronics.com/t_imageconverter565.php
 
 TFT_eSPI tft = TFT_eSPI();
+TFT_eSprite spriteRay = TFT_eSprite(&tft);
 
 // Set web server port number to 80
 WiFiServer server(80);
@@ -51,10 +52,12 @@ String botCommand = "!cr";
 int screenWidth = 320;
 int screenHeight = 170;
 // Set character height
-int charHeight = 20;
+int charHeight = 30;
 int rowHeight = (charHeight + 2);
 int screenRow = 0;
 
+uint16_t backgroundColor = TFT_WHITE;
+uint16_t textColor = TFT_BLACK;
 
 // put your setup code here, to run once:
 void setup() {
@@ -67,9 +70,14 @@ void setup() {
   tft.begin();
 
   tft.setRotation(3);
-  tft.fillScreen(TFT_BLACK);
-  tft.setSwapBytes(true);
-  tft.pushImage((screenWidth - 128), (screenHeight - 128), 128, 128, Ray);
+  tft.fillScreen(backgroundColor);
+
+  spriteRay.setSwapBytes(true);
+  spriteRay.createSprite(128, 128); 
+  spriteRay.pushImage(0, 0, 128, 128, Ray);
+  spriteRay.setSwapBytes(true);
+  spriteRay.pushSprite((screenWidth - 128), (screenHeight - 128), TFT_BLACK);
+ 
 
   // WiFiManager
   // Local intialization. Once its business is done, there is no need to keep it around
@@ -89,6 +97,9 @@ void setup() {
   Serial.println("Connected.");
   NewScreenMessage("Connected.", "", false);
   
+  tft.setCursor(0, screenHeight - rowHeight);
+  tft.println(WiFi.localIP());
+
   server.begin();
  
   ircChannel = "#" + twitchChannelName;
@@ -108,7 +119,12 @@ void loop() {
       Serial.println("CommuniRaytor activated!");
       //sendTwitchMessage("CommuniRaytor activated!");
       NewScreenMessage("Activated!", "CommuniRaytor", false);
-      tft.pushImage((screenWidth - 128), (screenHeight - 128), 128, 128, Ray);
+
+      spriteRay.setSwapBytes(true);
+      spriteRay.pushSprite((screenWidth - 128), (screenHeight - (128 + rowHeight)), TFT_BLACK);
+
+      tft.setCursor(0, screenHeight - rowHeight);
+      tft.println(WiFi.localIP());
     } 
     else {
       Serial.println("failed... try again in 5 seconds");
@@ -134,11 +150,11 @@ void NewScreenMessage(String message, String user, bool dontClear) {
   lastUser = user;
 
   tft.setTextSize(charHeight/10);
-  tft.setTextColor(TFT_GREEN);
+  tft.setTextColor(textColor);
 
   if(!dontClear)
   {
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(backgroundColor);
     screenRow = 0;
     tft.setCursor(0, screenRow*rowHeight);
   }
@@ -257,8 +273,8 @@ void callback(IRCMessage ircMessage) {
     commandAt = messageUppercase.indexOf(botCommandTemp);
     if (commandAt > -1)
     {
-      message = message.substring(commandAt + 3);
-      if (message.indexOf(" ") == 0)
+      message = message.substring(commandAt + 3); 
+      if (message.indexOf(" ") == 0) //if the first character is a space, make a new string after without that space
       {
         message = message.substring(1);
       }
@@ -268,13 +284,17 @@ void callback(IRCMessage ircMessage) {
     //prints chat to serial
     Serial.println(user + message);
 
+    messageUppercase.replace(" ",""); // Replace all spaces with to able to find the command only if its the first thing in the sentence
+
     //this is where you would replace these elements to match your streaming configureation. 
     if (commandAt > -1 && (ircMessage.badge.indexOf("MODERATOR") > -1 || ircMessage.badge.indexOf("BROADCASTER") > -1)){
       if (messageUppercase.indexOf("CLEAR") > -1)
       {
         screenMessage = "";
         lastUser = "";
-        tft.fillScreen(TFT_BLACK);
+        tft.fillScreen(backgroundColor);
+        Serial.println("Cleared");
+        sendTwitchMessage("!CRF Cleared");
       }
       else
       {
